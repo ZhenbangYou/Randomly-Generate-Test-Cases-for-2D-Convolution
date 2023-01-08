@@ -37,7 +37,16 @@ randMatrix !height !width = do
       !lsArr = map (listArray (0, width - 1)) ls2d
   return $! listArray (0, height - 1) lsArr
 
-convolution :: (IArray a1 e, IArray a2 (a1 Int e), IArray a3 e, IArray a4 (a3 Int e), Num e) => a4 Int (a3 Int e) -> a2 Int (a1 Int e) -> [[e]]
+convolution ::
+  ( IArray a1 e,
+    IArray a2 (a1 Int e),
+    IArray a3 e,
+    IArray a4 (a3 Int e),
+    Num e
+  ) =>
+  a4 Int (a3 Int e) ->
+  a2 Int (a1 Int e) ->
+  [[e]]
 convolution !input !weight =
   let !hi = snd $ bounds input
       !hw = snd $ bounds weight
