@@ -14,6 +14,7 @@ import Data.List.Split (chunksOf)
 import Data.String.Interpolate (i)
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
 import System.Directory (createDirectoryIfMissing)
+import System.FilePath ((<.>), (</>))
 import System.Random (randomIO)
 
 (|>) :: t1 -> (t1 -> t2) -> t2
@@ -36,10 +37,10 @@ convolution !input !weight =
       !wi = snd $ bounds $ input ! 0
       !ww = snd $ bounds $ weight ! 0
       !res4dFlat = do
-        rowIx <- [0 .. hi - hw]
-        colIx <- [0 .. wi - ww]
-        hIx <- [0 .. hw]
-        wIx <- [0 .. ww]
+        !rowIx <- [0 .. hi - hw]
+        !colIx <- [0 .. wi - ww]
+        !hIx <- [0 .. hw]
+        !wIx <- [0 .. ww]
         return $! (input ! (rowIx + hIx) ! (colIx + wIx)) * (weight ! hIx ! wIx)
       !res3dFlat = map sum $ chunksOf (ww + 1) res4dFlat
       !res2dFlat = map sum $ chunksOf (hw + 1) res3dFlat
@@ -73,15 +74,15 @@ twoDimArrayToString !xss =
     |> elems
     |> twoDimListToString
 
-outputOneCase :: (Int, Int, Int, Int) -> [Char] -> IO ()
+outputOneCase :: (Int, Int, Int, Int) -> FilePath -> IO ()
 outputOneCase (!inputHeight, !inputWidth, !weightHeight, !weightWidth) !path = do
-  input <- randMatrix inputHeight inputWidth
-  weight <- randMatrix weightHeight weightWidth
+  !input <- randMatrix inputHeight inputWidth
+  !weight <- randMatrix weightHeight weightWidth
   let !output = convolution input weight
-      !outputDirPath = [i|#{path}/#{inputHeight}x#{inputWidth}_#{weightHeight}x#{weightWidth}|] :: String
-      !inputFile = [i|#{outputDirPath}/input.txt|]
-      !weightFile = [i|#{outputDirPath}/weight.txt|]
-      !outputFile = [i|#{outputDirPath}/output.txt|]
+      !outputDirPath = path </> [i|#{inputHeight}x#{inputWidth}_#{weightHeight}x#{weightWidth}|]
+      !inputFile = outputDirPath </> "input" <.> "txt"
+      !weightFile = outputDirPath </> "weight" <.> "txt"
+      !outputFile = outputDirPath </> "output" <.> "txt"
   createDirectoryIfMissing True outputDirPath
   writeFile inputFile [i|#{inputHeight} #{inputWidth}\n|]
   writeFile weightFile [i|#{weightHeight} #{weightWidth}\n|]
@@ -90,7 +91,7 @@ outputOneCase (!inputHeight, !inputWidth, !weightHeight, !weightWidth) !path = d
   appendFile weightFile $ twoDimArrayToString weight
   appendFile outputFile $ twoDimListToString output
 
-outputCases :: [(Int, Int, Int, Int)] -> [Char] -> IO ()
+outputCases :: [(Int, Int, Int, Int)] -> FilePath -> IO ()
 outputCases !shapeList !path = mapM_ (\x -> outputOneCase x path) shapeList
 
 main :: IO ()
