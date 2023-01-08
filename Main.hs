@@ -8,13 +8,11 @@ module Main (main) where
 
 import Control.Concurrent (forkFinally, putMVar, takeMVar)
 import Control.Concurrent.MVar (newEmptyMVar)
-import Control.Monad (replicateM, replicateM_)
+import Control.Monad (forM_, replicateM_)
 import Control.Monad.IO.Class (MonadIO)
 import Data.Array (Array)
-import Data.Array.IArray (IArray, amap, bounds, elems, listArray, (!))
-import Data.Ix (Ix)
-import Data.List (foldl1')
-import Data.List.Split (chunksOf)
+import Data.Array.IO (IOUArray)
+import Data.Array.MArray (Ix, MArray (newArray), freeze, readArray, writeArray)
 import Data.String.Interpolate (i)
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
 import System.Directory (createDirectoryIfMissing)
@@ -24,95 +22,86 @@ import System.Random.Stateful (Random)
 
 type RandomNumberType = Float
 
-(|>) :: t1 -> (t1 -> t2) -> t2
-x |> f = f x
-
-randList :: (Random a, MonadIO m) => Int -> m [a]
-randList !size = replicateM size randomIO
-
 randMatrix ::
-  ( Random e,
-    MonadIO m,
-    IArray a1 e,
-    IArray a2 (a1 Int e)
+  ( MArray a e m,
+    Ix i,
+    Num i,
+    Num e,
+    Enum i,
+    Random e,
+    MonadIO m
   ) =>
-  Int ->
-  Int ->
-  m (a2 Int (a1 Int e))
+  i ->
+  i ->
+  m (a i e)
 randMatrix !height !width = do
-  !ls <- randList (height * width)
-  let !ls2d = chunksOf width ls
-      !lsArr = map (listArray (0, width - 1)) ls2d
-  return $! listArray (0, height - 1) lsArr
+  arr <- newArray (0, height * width - 1) 0
+  forM_ [0 .. height * width - 1] $ \ix ->
+    ( do
+        num <- randomIO
+        writeArray arr ix num
+    )
+  return arr
 
 convolution ::
-  ( IArray a1 e,
-    IArray a2 (a1 Int e),
-    IArray a3 e,
-    IArray a4 (a3 Int e),
-    Num e
-  ) =>
-  a4 Int (a3 Int e) ->
-  a2 Int (a1 Int e) ->
-  [[e]]
-convolution !input !weight =
-  let !hi = snd $ bounds input
-      !hw = snd $ bounds weight
-      !wi = snd $ bounds $ input ! 0
-      !ww = snd $ bounds $ weight ! 0
-      !res4dFlat = do
-        !rowIx <- [0 .. hi - hw]
-        !colIx <- [0 .. wi - ww]
-        !hIx <- [0 .. hw]
-        !wIx <- [0 .. ww]
-        return $! (input ! (rowIx + hIx) ! (colIx + wIx)) * (weight ! hIx ! wIx)
-      !res2dFlat = map sum $ chunksOf ((hw + 1) * (ww + 1)) res4dFlat
-   in chunksOf (wi - ww + 1) res2dFlat
-
-listToString :: Show a => [a] -> String
-listToString !xs =
-  xs
-    |> map show
-    |> foldl1' (\a b -> a ++ " " ++ b)
-
-twoDimListToString :: Show a => [[a]] -> String
-twoDimListToString !xss =
-  xss
-    |> map listToString
-    |> foldl1' (\a b -> a ++ "\n" ++ b)
-
-twoDimArrayToString ::
-  ( IArray a1 (a2 i1 e),
-    IArray a1 [e],
-    IArray a2 e,
-    Ix i2,
-    Ix i1,
-    Show e
-  ) =>
-  a1 i2 (a2 i1 e) ->
-  String
-twoDimArrayToString !xss =
-  xss
-    |> amap elems
-    |> elems
-    |> twoDimListToString
+  IOUArray Int RandomNumberType ->
+  (Int, Int) ->
+  IOUArray Int RandomNumberType ->
+  (Int, Int) ->
+  IO (IOUArray Int RandomNumberType)
+convolution !input (!inputHeight, !inputWidth) !weight (!weightHeight, !weightWidth) = do
+  let (!outputHeight, !outputWidth) = (inputHeight - weightHeight + 1, inputWidth - weightWidth + 1)
+  !output <- newArray (0, outputHeight * outputWidth - 1) 0
+  forM_
+    [0 .. inputHeight - weightHeight]
+    ( \oh ->
+        forM_
+          [0 .. inputWidth - weightWidth]
+          ( \ow ->
+              forM_
+                [0 .. weightHeight - 1]
+                ( \wh ->
+                    forM_
+                      [0 .. weightWidth - 1]
+                      ( \ww -> do
+                          let (ih, iw) = (oh + wh, ow + ww)
+                          srcI <- readArray input (ih * inputWidth + iw)
+                          srcW <- readArray weight (wh * weightWidth + ww)
+                          modifyArray output (oh * outputWidth + ow) (+ (srcI * srcW))
+                      )
+                )
+          )
+    )
+  return $! output
+  where
+    modifyArray !arr !ix !f = do
+      origin <- readArray arr ix
+      writeArray arr ix (f origin)
 
 outputOneCase :: (Int, Int, Int, Int) -> FilePath -> IO ()
 outputOneCase (!inputHeight, !inputWidth, !weightHeight, !weightWidth) !path = do
-  !input <- randMatrix inputHeight inputWidth :: IO (Array Int (Array Int RandomNumberType))
-  !weight <- randMatrix weightHeight weightWidth :: IO (Array Int (Array Int RandomNumberType))
-  let !output = convolution input weight
-      !outputDirPath = path </> [i|#{inputHeight}x#{inputWidth}_#{weightHeight}x#{weightWidth}|]
+  !input <- randMatrix inputHeight inputWidth
+  !weight <- randMatrix weightHeight weightWidth
+  !output <- convolution input (inputHeight, inputWidth) weight (weightHeight, weightWidth)
+
+  !input <- freeze input :: IO (Array Int RandomNumberType)
+  !weight <- freeze weight :: IO (Array Int RandomNumberType)
+  !output <- freeze output :: IO (Array Int RandomNumberType)
+
+  let !outputDirPath = path </> [i|#{inputHeight}x#{inputWidth}_#{weightHeight}x#{weightWidth}|]
       !inputFile = outputDirPath </> "input" <.> "txt"
       !weightFile = outputDirPath </> "weight" <.> "txt"
       !outputFile = outputDirPath </> "output" <.> "txt"
+
   createDirectoryIfMissing True outputDirPath
+  
   writeFile inputFile [i|#{inputHeight} #{inputWidth}\n|]
   writeFile weightFile [i|#{weightHeight} #{weightWidth}\n|]
   writeFile outputFile [i|#{inputHeight-weightHeight+1} #{inputWidth-weightWidth+1}\n|]
-  appendFile inputFile $ twoDimArrayToString input
-  appendFile weightFile $ twoDimArrayToString weight
-  appendFile outputFile $ twoDimListToString output
+
+  appendFile inputFile $ show input
+  appendFile weightFile $ show weight
+  appendFile outputFile $ show output
 
 outputCases :: [(Int, Int, Int, Int)] -> FilePath -> IO ()
 outputCases !shapeList !path = do
@@ -134,14 +123,15 @@ main :: IO ()
 main = do
   start <- getCurrentTime
   let shapeList =
-        [ (64, 64, 8, 8),
-          (64, 64, 16, 16),
-          (64, 64, 32, 32),
-          (64, 64, 64, 64),
+        [ (2, 2, 2, 2),
           (128, 128, 8, 8),
           (128, 128, 16, 16),
           (128, 128, 32, 32),
-          (128, 128, 64, 64)
+          (128, 128, 64, 64),
+          (256, 256, 8, 8),
+          (256, 256, 16, 16),
+          (256, 256, 32, 32),
+          (256, 256, 64, 64)
         ] ::
           [(Int, Int, Int, Int)]
   outputCases shapeList "./cases"
