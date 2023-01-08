@@ -66,8 +66,7 @@ convolution !input !weight =
         !hIx <- [0 .. hw]
         !wIx <- [0 .. ww]
         return $! (input ! (rowIx + hIx) ! (colIx + wIx)) * (weight ! hIx ! wIx)
-      !res3dFlat = map sum $ chunksOf (ww + 1) res4dFlat
-      !res2dFlat = map sum $ chunksOf (hw + 1) res3dFlat
+      !res2dFlat = map sum $ chunksOf ((hw + 1) * (ww + 1)) res4dFlat
    in chunksOf (wi - ww + 1) res2dFlat
 
 listToString :: Show a => [a] -> String
