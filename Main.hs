@@ -28,7 +28,7 @@ randList !size = replicateM size (randomIO :: IO Float)
 
 randMatrix :: Int -> Int -> IO (Array Int (Array Int Float))
 randMatrix !height !width = do
-  ls <- randList (height * width)
+  !ls <- randList (height * width)
   let !ls2d = chunksOf width ls
       !lsArr = map (listArray (0, width - 1)) ls2d
   return $! listArray (0, height - 1) lsArr
