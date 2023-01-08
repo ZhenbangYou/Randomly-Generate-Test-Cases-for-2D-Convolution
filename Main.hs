@@ -133,6 +133,17 @@ outputCases !shapeList !path = do
 main :: IO ()
 main = do
   start <- getCurrentTime
-  outputCases [(128, 128, 8, 8), (128, 128, 16, 16), (128, 128, 32, 32), (128, 128, 64, 64)] "./cases"
+  let shapeList =
+        [ (64, 64, 8, 8),
+          (64, 64, 16, 16),
+          (64, 64, 32, 32),
+          (64, 64, 64, 64),
+          (128, 128, 8, 8),
+          (128, 128, 16, 16),
+          (128, 128, 32, 32),
+          (128, 128, 64, 64)
+        ] ::
+          [(Int, Int, Int, Int)]
+  outputCases shapeList "./cases"
   end <- getCurrentTime
   putStrLn [i|#{end `diffUTCTime` start} elapsed.|]
