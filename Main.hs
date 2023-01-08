@@ -96,6 +96,6 @@ outputCases !shapeList !path = mapM_ (\x -> outputOneCase x path) shapeList
 main :: IO ()
 main = do
   start <- getCurrentTime
-  outputCases [(128, 128, 16, 16),(128, 128, 32, 32)] "./cases"
+  outputCases [(128, 128, 16, 16), (128, 128, 32, 32)] "./cases"
   end <- getCurrentTime
   putStrLn [i|#{end `diffUTCTime` start} elapsed.|]
