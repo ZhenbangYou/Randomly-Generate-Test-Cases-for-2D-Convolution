@@ -1,11 +1,14 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE QuasiQuotes #-}
 
 module Main (main) where
 
-import Control.Monad (replicateM)
+import Control.Concurrent (forkFinally, putMVar, takeMVar)
+import Control.Concurrent.MVar (newEmptyMVar)
+import Control.Monad (replicateM, replicateM_)
 import Data.Array (Array)
 import Data.Array.IArray (IArray, amap, bounds, elems, listArray, (!))
 import Data.Ix (Ix)
@@ -92,11 +95,24 @@ outputOneCase (!inputHeight, !inputWidth, !weightHeight, !weightWidth) !path = d
   appendFile outputFile $ twoDimListToString output
 
 outputCases :: [(Int, Int, Int, Int)] -> FilePath -> IO ()
-outputCases !shapeList !path = mapM_ (\x -> outputOneCase x path) shapeList
+outputCases !shapeList !path = do
+  let !numJobs = length shapeList
+  !wg <- newEmptyMVar
+  mapM_
+    ( \x ->
+        forkFinally
+          (outputOneCase x path)
+          ( \case
+              Right _ -> putMVar wg ()
+              Left _ -> error "an error occured"
+          )
+    )
+    shapeList
+  replicateM_ numJobs $! takeMVar wg
 
 main :: IO ()
 main = do
   start <- getCurrentTime
-  outputCases [(128, 128, 16, 16), (128, 128, 32, 32)] "./cases"
+  outputCases [(128, 128, 8, 8), (128, 128, 16, 16), (128, 128, 32, 32), (128, 128, 64, 64)] "./cases"
   end <- getCurrentTime
   putStrLn [i|#{end `diffUTCTime` start} elapsed.|]
