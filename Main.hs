@@ -44,11 +44,17 @@ randMatrix !height !width = do
   return arr
 
 convolution ::
-  IOUArray Int RandomNumberType ->
-  (Int, Int) ->
-  IOUArray Int RandomNumberType ->
-  (Int, Int) ->
-  IO (IOUArray Int RandomNumberType)
+  ( Ix i,
+    Num i,
+    Num t,
+    Enum i,
+    MArray a t m
+  ) =>
+  a i t ->
+  (i, i) ->
+  a i t ->
+  (i, i) ->
+  m (a i t)
 convolution !input (!inputHeight, !inputWidth) !weight (!weightHeight, !weightWidth) = do
   let (!outputHeight, !outputWidth) = (inputHeight - weightHeight + 1, inputWidth - weightWidth + 1)
   !output <- newArray (0, outputHeight * outputWidth - 1) 0
@@ -80,7 +86,7 @@ convolution !input (!inputHeight, !inputWidth) !weight (!weightHeight, !weightWi
 
 outputOneCase :: (Int, Int, Int, Int) -> FilePath -> IO ()
 outputOneCase (!inputHeight, !inputWidth, !weightHeight, !weightWidth) !path = do
-  !input <- randMatrix inputHeight inputWidth
+  !input <- randMatrix inputHeight inputWidth :: IO (IOUArray Int RandomNumberType)
   !weight <- randMatrix weightHeight weightWidth
   !output <- convolution input (inputHeight, inputWidth) weight (weightHeight, weightWidth)
 
@@ -94,7 +100,7 @@ outputOneCase (!inputHeight, !inputWidth, !weightHeight, !weightWidth) !path = d
       !outputFile = outputDirPath </> "output" <.> "txt"
 
   createDirectoryIfMissing True outputDirPath
-  
+
   writeFile inputFile [i|#{inputHeight} #{inputWidth}\n|]
   writeFile weightFile [i|#{weightHeight} #{weightWidth}\n|]
   writeFile outputFile [i|#{inputHeight-weightHeight+1} #{inputWidth-weightWidth+1}\n|]
@@ -123,15 +129,14 @@ main :: IO ()
 main = do
   start <- getCurrentTime
   let shapeList =
-        [ (2, 2, 2, 2),
-          (128, 128, 8, 8),
-          (128, 128, 16, 16),
-          (128, 128, 32, 32),
-          (128, 128, 64, 64),
-          (256, 256, 8, 8),
-          (256, 256, 16, 16),
-          (256, 256, 32, 32),
-          (256, 256, 64, 64)
+        [ (512, 512, 8, 8),
+          (512, 512, 16, 16),
+          (512, 512, 32, 32),
+          (512, 512, 64, 64),
+          (1024, 1024, 8, 8),
+          (1024, 1024, 16, 16),
+          (1024, 1024, 32, 32),
+          (1024, 1024, 64, 64)
         ] ::
           [(Int, Int, Int, Int)]
   outputCases shapeList "./cases"
