@@ -137,8 +137,7 @@ main = do
           (1024, 1024, 16, 16),
           (1024, 1024, 32, 32),
           (1024, 1024, 64, 64)
-        ] ::
-          [(Int, Int, Int, Int)]
+        ]
   outputCases shapeList "./cases"
   end <- getCurrentTime
   putStrLn [i|#{end `diffUTCTime` start} elapsed.|]
