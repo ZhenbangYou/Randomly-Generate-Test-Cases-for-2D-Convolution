@@ -25,24 +25,24 @@ randList !size = replicateM size (randomIO :: IO Float)
 randMatrix :: Int -> Int -> IO (Array Int (Array Int Float))
 randMatrix !height !width = do
   ls <- randList (height * width)
-  let ls2d = chunksOf width ls
-  let lsArr = map (listArray (0, width - 1)) ls2d
+  let !ls2d = chunksOf width ls
+      !lsArr = map (listArray (0, width - 1)) ls2d
   return $! listArray (0, height - 1) lsArr
 
 convolution :: Array Int (Array Int Float) -> Array Int (Array Int Float) -> [[Float]]
 convolution !input !weight =
-  let hi = snd $ bounds input
-      hw = snd $ bounds weight
-      wi = snd $ bounds $ input ! 0
-      ww = snd $ bounds $ weight ! 0
-      res4dFlat = do
+  let !hi = snd $ bounds input
+      !hw = snd $ bounds weight
+      !wi = snd $ bounds $ input ! 0
+      !ww = snd $ bounds $ weight ! 0
+      !res4dFlat = do
         rowIx <- [0 .. hi - hw]
         colIx <- [0 .. wi - ww]
         hIx <- [0 .. hw]
         wIx <- [0 .. ww]
         return $! (input ! (rowIx + hIx) ! (colIx + wIx)) * (weight ! hIx ! wIx)
-      res3dFlat = map sum $ chunksOf (ww + 1) res4dFlat
-      res2dFlat = map sum $ chunksOf (hw + 1) res3dFlat
+      !res3dFlat = map sum $ chunksOf (ww + 1) res4dFlat
+      !res2dFlat = map sum $ chunksOf (hw + 1) res3dFlat
    in chunksOf (wi - ww + 1) res2dFlat
 
 listToString :: Show a => [a] -> String
@@ -77,11 +77,11 @@ outputOneCase :: (Int, Int, Int, Int) -> [Char] -> IO ()
 outputOneCase (!inputHeight, !inputWidth, !weightHeight, !weightWidth) !path = do
   input <- randMatrix inputHeight inputWidth
   weight <- randMatrix weightHeight weightWidth
-  let output = convolution input weight
-      outputDir = [i|#{inputHeight}x#{inputWidth}_#{weightHeight}x#{weightWidth}|]
-      inputFile = path ++ outputDir ++ "input.txt"
-      weightFile = path ++ outputDir ++ "weight.txt"
-      outputFile = path ++ outputDir ++ "output.txt"
+  let !output = convolution input weight
+      !outputDir = [i|#{inputHeight}x#{inputWidth}_#{weightHeight}x#{weightWidth}|]
+      !inputFile = path ++ outputDir ++ "input.txt"
+      !weightFile = path ++ outputDir ++ "weight.txt"
+      !outputFile = path ++ outputDir ++ "output.txt"
   writeFile inputFile [i|#{inputHeight} #{inputWidth}\n|]
   writeFile weightFile [i|#{weightHeight} #{weightWidth}\n|]
   writeFile outputFile [i|#{inputHeight-weightHeight+1} #{inputWidth-weightWidth+1}\n|]
