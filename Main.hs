@@ -30,7 +30,15 @@ x |> f = f x
 randList :: (Random a, MonadIO m) => Int -> m [a]
 randList !size = replicateM size randomIO
 
-randMatrix :: (Random e, MonadIO m, IArray a1 e, IArray a2 (a1 Int e)) => Int -> Int -> m (a2 Int (a1 Int e))
+randMatrix ::
+  ( Random e,
+    MonadIO m,
+    IArray a1 e,
+    IArray a2 (a1 Int e)
+  ) =>
+  Int ->
+  Int ->
+  m (a2 Int (a1 Int e))
 randMatrix !height !width = do
   !ls <- randList (height * width)
   let !ls2d = chunksOf width ls
