@@ -10,9 +10,9 @@ import Control.Concurrent (forkFinally, putMVar, takeMVar)
 import Control.Concurrent.MVar (newEmptyMVar)
 import Control.Monad (forM_, replicateM_)
 import Control.Monad.IO.Class (MonadIO)
-import Data.Array (Array)
 import Data.Array.IO (IOUArray)
 import Data.Array.MArray (Ix, MArray (newArray), freeze, readArray, writeArray)
+import Data.Array.Unboxed (UArray)
 import Data.String.Interpolate (i)
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
 import System.Directory (createDirectoryIfMissing)
@@ -90,9 +90,9 @@ outputOneCase (!inputHeight, !inputWidth, !weightHeight, !weightWidth) !path = d
   !weight <- randMatrix weightHeight weightWidth
   !output <- convolution input (inputHeight, inputWidth) weight (weightHeight, weightWidth)
 
-  !input <- freeze input :: IO (Array Int RandomNumberType)
-  !weight <- freeze weight :: IO (Array Int RandomNumberType)
-  !output <- freeze output :: IO (Array Int RandomNumberType)
+  !input <- freeze input :: IO (UArray Int RandomNumberType)
+  !weight <- freeze weight :: IO (UArray Int RandomNumberType)
+  !output <- freeze output :: IO (UArray Int RandomNumberType)
 
   let !outputDirPath = path </> [i|#{inputHeight}x#{inputWidth}_#{weightHeight}x#{weightWidth}|]
       !inputFile = outputDirPath </> "input" <.> "txt"
@@ -129,11 +129,7 @@ main :: IO ()
 main = do
   start <- getCurrentTime
   let shapeList =
-        [ (512, 512, 8, 8),
-          (512, 512, 16, 16),
-          (512, 512, 32, 32),
-          (512, 512, 64, 64),
-          (1024, 1024, 8, 8),
+        [ (1024, 1024, 8, 8),
           (1024, 1024, 16, 16),
           (1024, 1024, 32, 32),
           (1024, 1024, 64, 64)
