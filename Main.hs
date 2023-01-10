@@ -8,11 +8,12 @@ module Main (main) where
 
 import Control.Concurrent (forkFinally, putMVar, takeMVar)
 import Control.Concurrent.MVar (newEmptyMVar)
-import Control.Monad (forM_, replicateM_)
+import Control.Monad (replicateM_)
 import Control.Monad.IO.Class (MonadIO)
 import Data.Array.IO (IOUArray)
 import Data.Array.MArray (Ix, MArray (newArray), freeze, readArray, writeArray)
 import Data.Array.Unboxed (UArray)
+import Data.Foldable (for_)
 import Data.String.Interpolate (i)
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
 import System.Directory (createDirectoryIfMissing)
@@ -36,7 +37,7 @@ randMatrix ::
   m (a i e)
 randMatrix !height !width = do
   arr <- newArray (0, height * width - 1) 0
-  forM_ [0 .. height * width - 1] $ \ix ->
+  for_ [0 .. height * width - 1] $ \ix ->
     ( do
         num <- randomIO
         writeArray arr ix num
@@ -58,16 +59,16 @@ convolution ::
 convolution !input (!inputHeight, !inputWidth) !weight (!weightHeight, !weightWidth) = do
   let (!outputHeight, !outputWidth) = (inputHeight - weightHeight + 1, inputWidth - weightWidth + 1)
   !output <- newArray (0, outputHeight * outputWidth - 1) 0
-  forM_
+  for_
     [0 .. inputHeight - weightHeight]
     ( \oh ->
-        forM_
+        for_
           [0 .. inputWidth - weightWidth]
           ( \ow ->
-              forM_
+              for_
                 [0 .. weightHeight - 1]
                 ( \wh ->
-                    forM_
+                    for_
                       [0 .. weightWidth - 1]
                       ( \ww -> do
                           let (ih, iw) = (oh + wh, ow + ww)
@@ -129,10 +130,10 @@ main :: IO ()
 main = do
   start <- getCurrentTime
   let shapeList =
-        [ (1024, 1024, 8, 8),
-          (1024, 1024, 16, 16),
-          (1024, 1024, 32, 32),
-          (1024, 1024, 64, 64)
+        [ (256, 256, 8, 8),
+          (256, 256, 16, 16),
+          (256, 256, 32, 32),
+          (256, 256, 64, 64)
         ]
   outputCases shapeList "./cases"
   end <- getCurrentTime
