@@ -9,40 +9,41 @@ module Main (main) where
 import Control.Concurrent (forkFinally, putMVar, takeMVar)
 import Control.Concurrent.MVar (newEmptyMVar)
 import Control.Monad (replicateM_)
-import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.State.Strict (MonadState, runState, state)
 import Data.Array.IO (IOUArray)
 import Data.Array.MArray (Ix, MArray (newArray), freeze, readArray, writeArray)
 import Data.Array.Unboxed (UArray)
 import Data.Foldable (for_)
+import Data.Int (Int64)
 import Data.String.Interpolate (i)
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((<.>), (</>))
-import System.Random (randomIO)
-import System.Random.Stateful (Random)
 
 type RandomNumberType = Float
 
-randMatrix ::
-  ( MArray a e m,
-    Ix i,
-    Num i,
-    Num e,
-    Enum i,
-    Random e,
-    MonadIO m
-  ) =>
-  i ->
-  i ->
-  m (a i e)
-randMatrix !height !width = do
-  arr <- newArray (0, height * width - 1) 0
-  for_ [0 .. height * width - 1] $ \ix ->
-    ( do
-        num <- randomIO
-        writeArray arr ix num
+rng :: MonadState Int64 m => m Int64
+rng =
+  state
+    ( \s ->
+        let next = s * 1103515245 + 12345
+         in ((next `div` 65536) `mod` 32768, next)
     )
-  return arr
+
+randMatrix :: (Num e, Num t, Ix t, MArray a e m) => t -> t -> Int64 -> m (a t e)
+randMatrix !height !width !seed = do
+  arr <- newArray (0, height * width - 1) 0
+  let fill !ix !seed =
+        ( if ix >= height * width
+            then return arr
+            else
+              let (int, nextSeed) = runState rng seed
+               in ( do
+                      writeArray arr ix (fromIntegral (int `div` 128) - 128)
+                      fill (ix + 1) nextSeed
+                  )
+        )
+  fill 0 seed
 
 convolution ::
   ( Ix i,
@@ -57,7 +58,8 @@ convolution ::
   (i, i) ->
   m (a i t)
 convolution !input (!inputHeight, !inputWidth) !weight (!weightHeight, !weightWidth) = do
-  let (!outputHeight, !outputWidth) = (inputHeight - weightHeight + 1, inputWidth - weightWidth + 1)
+  let (!outputHeight, !outputWidth) =
+        (inputHeight - weightHeight + 1, inputWidth - weightWidth + 1)
   !output <- newArray (0, outputHeight * outputWidth - 1) 0
   for_
     [0 .. inputHeight - weightHeight]
@@ -85,55 +87,73 @@ convolution !input (!inputHeight, !inputWidth) !weight (!weightHeight, !weightWi
       origin <- readArray arr ix
       writeArray arr ix (f origin)
 
-outputOneCase :: (Int, Int, Int, Int) -> FilePath -> IO ()
-outputOneCase (!inputHeight, !inputWidth, !weightHeight, !weightWidth) !path = do
-  !input <- randMatrix inputHeight inputWidth :: IO (IOUArray Int RandomNumberType)
-  !weight <- randMatrix weightHeight weightWidth
-  !output <- convolution input (inputHeight, inputWidth) weight (weightHeight, weightWidth)
+outputOneCase ::
+  (Int, Int, Int, Int) ->
+  FilePath ->
+  (Int64, Int64) ->
+  IO ()
+outputOneCase
+  ( !inputHeight,
+    !inputWidth,
+    !weightHeight,
+    !weightWidth
+    )
+  !path
+  (!seed1, !seed2) = do
+    !input <- randMatrix inputHeight inputWidth seed1 :: IO (IOUArray Int RandomNumberType)
+    !weight <- randMatrix weightHeight weightWidth seed2
+    !output <-
+      convolution
+        input
+        (inputHeight, inputWidth)
+        weight
+        (weightHeight, weightWidth)
 
-  !inputImmutable <- freeze input :: IO (UArray Int RandomNumberType)
-  !weightImmutable <- freeze weight :: IO (UArray Int RandomNumberType)
-  !outputImmutable <- freeze output :: IO (UArray Int RandomNumberType)
+    !inputImmutable <- freeze input :: IO (UArray Int RandomNumberType)
+    !weightImmutable <- freeze weight :: IO (UArray Int RandomNumberType)
+    !outputImmutable <- freeze output :: IO (UArray Int RandomNumberType)
 
-  let !outputDirPath = path </> [i|#{inputHeight}x#{inputWidth}_#{weightHeight}x#{weightWidth}|]
-      !inputFile = outputDirPath </> "input" <.> "txt"
-      !weightFile = outputDirPath </> "weight" <.> "txt"
-      !outputFile = outputDirPath </> "output" <.> "txt"
+    let !outputDirPath =
+          path
+            </> [i|#{inputHeight}x#{inputWidth}_#{weightHeight}x#{weightWidth}|]
+        !inputFile = outputDirPath </> "input" <.> "txt"
+        !weightFile = outputDirPath </> "weight" <.> "txt"
+        !outputFile = outputDirPath </> "output" <.> "txt"
 
-  createDirectoryIfMissing True outputDirPath
+    createDirectoryIfMissing True outputDirPath
 
-  writeFile inputFile [i|#{inputHeight} #{inputWidth}\n|]
-  writeFile weightFile [i|#{weightHeight} #{weightWidth}\n|]
-  writeFile outputFile [i|#{inputHeight-weightHeight+1} #{inputWidth-weightWidth+1}\n|]
+    writeFile inputFile [i|#{inputHeight} #{inputWidth}\n|]
+    writeFile weightFile [i|#{weightHeight} #{weightWidth}\n|]
+    writeFile outputFile [i|#{inputHeight-weightHeight+1} #{inputWidth-weightWidth+1}\n|]
 
-  appendFile inputFile $ show inputImmutable
-  appendFile weightFile $ show weightImmutable
-  appendFile outputFile $ show outputImmutable
+    appendFile inputFile $ show inputImmutable
+    appendFile weightFile $ show weightImmutable
+    appendFile outputFile $ show outputImmutable
 
 outputCases :: [(Int, Int, Int, Int)] -> FilePath -> IO ()
 outputCases !shapeList !path = do
   let !numJobs = length shapeList
   !wg <- newEmptyMVar
-  mapM_
-    ( \x ->
+  for_
+    (zip [1 ..] shapeList)
+    ( \(!ix, !shape) ->
         forkFinally
-          (outputOneCase x path)
+          (outputOneCase shape path (ix * 2, ix * 2 + 1))
           ( \case
               Right _ -> putMVar wg ()
               Left _ -> error "an error occured"
           )
     )
-    shapeList
   replicateM_ numJobs $! takeMVar wg
 
 main :: IO ()
 main = do
   start <- getCurrentTime
   let shapeList =
-        [ (256, 256, 8, 8),
-          (256, 256, 16, 16),
-          (256, 256, 32, 32),
-          (256, 256, 64, 64)
+        [ (1024, 1024, 8, 8),
+          (1024, 1024, 16, 16),
+          (1024, 1024, 32, 32),
+          (1024, 1024, 64, 64)
         ]
   outputCases shapeList "./cases"
   end <- getCurrentTime
