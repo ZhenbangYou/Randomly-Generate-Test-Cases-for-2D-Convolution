@@ -9,12 +9,11 @@ import Control.Concurrent (forkFinally, putMVar, takeMVar)
 import Control.Concurrent.MVar (newEmptyMVar)
 import Control.Monad (replicateM_)
 import Control.Monad.ST.Strict (ST)
-import Control.Monad.State.Strict (StateT, runState, state)
+import Control.Monad.State.Strict (runState, state, State)
 import Data.Array.MArray (Ix, MArray (newArray), readArray, writeArray)
 import Data.Array.ST (STUArray, runSTUArray)
 import Data.Array.Unboxed (IArray, UArray, (!))
 import Data.Foldable (for_)
-import Data.Functor.Identity (Identity)
 import Data.Int (Int64)
 import Data.String.Interpolate (i)
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
@@ -23,7 +22,7 @@ import System.FilePath ((<.>), (</>))
 
 type RandomNumberType = Float
 
-rng :: StateT Int64 Identity Int64
+rng :: State Int64 Int64
 rng =
   state
     ( \s ->
