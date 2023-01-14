@@ -9,7 +9,7 @@ import Control.Concurrent (forkFinally, putMVar, takeMVar)
 import Control.Concurrent.MVar (newEmptyMVar)
 import Control.Monad (replicateM_)
 import Control.Monad.ST.Strict (ST)
-import Control.Monad.State.Strict (runState, state, State)
+import Control.Monad.State.Strict (State, runState, state)
 import Data.Array.MArray (Ix, MArray (newArray), readArray, writeArray)
 import Data.Array.ST (STUArray, runSTUArray)
 import Data.Array.Unboxed (IArray, UArray, (!))
@@ -115,7 +115,11 @@ genOneCase
             )
         !output =
           runSTUArray
-            ( convolution input (inputHeight, inputWidth) weight (weightHeight, weightWidth) ::
+            ( convolution
+                input
+                (inputHeight, inputWidth)
+                weight
+                (weightHeight, weightWidth) ::
                 (forall s. ST s (STUArray s Int RandomNumberType))
             )
      in (input, weight, output)
