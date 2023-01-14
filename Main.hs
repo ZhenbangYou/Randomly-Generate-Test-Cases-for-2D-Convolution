@@ -91,9 +91,9 @@ outputOneCase (!inputHeight, !inputWidth, !weightHeight, !weightWidth) !path = d
   !weight <- randMatrix weightHeight weightWidth
   !output <- convolution input (inputHeight, inputWidth) weight (weightHeight, weightWidth)
 
-  !input <- freeze input :: IO (UArray Int RandomNumberType)
-  !weight <- freeze weight :: IO (UArray Int RandomNumberType)
-  !output <- freeze output :: IO (UArray Int RandomNumberType)
+  !inputImmutable <- freeze input :: IO (UArray Int RandomNumberType)
+  !weightImmutable <- freeze weight :: IO (UArray Int RandomNumberType)
+  !outputImmutable <- freeze output :: IO (UArray Int RandomNumberType)
 
   let !outputDirPath = path </> [i|#{inputHeight}x#{inputWidth}_#{weightHeight}x#{weightWidth}|]
       !inputFile = outputDirPath </> "input" <.> "txt"
@@ -106,9 +106,9 @@ outputOneCase (!inputHeight, !inputWidth, !weightHeight, !weightWidth) !path = d
   writeFile weightFile [i|#{weightHeight} #{weightWidth}\n|]
   writeFile outputFile [i|#{inputHeight-weightHeight+1} #{inputWidth-weightWidth+1}\n|]
 
-  appendFile inputFile $ show input
-  appendFile weightFile $ show weight
-  appendFile outputFile $ show output
+  appendFile inputFile $ show inputImmutable
+  appendFile weightFile $ show weightImmutable
+  appendFile outputFile $ show outputImmutable
 
 outputCases :: [(Int, Int, Int, Int)] -> FilePath -> IO ()
 outputCases !shapeList !path = do
