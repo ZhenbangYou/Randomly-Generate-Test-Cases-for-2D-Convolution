@@ -88,7 +88,7 @@ convolution !input (!inputHeight, !inputWidth) !weight (!weightHeight, !weightWi
   where
     modifyArray !arr !ix !f = do
       !origin <- readArray arr ix
-      writeArray arr ix (f origin)
+      writeArray arr ix $! f origin
 
 genOneCase ::
   (Int, Int, Int, Int) ->
@@ -121,6 +121,12 @@ genOneCase
             )
      in (input, weight, output)
 
+outputMatrix :: UArray Int RandomNumberType -> (Int, Int) -> FilePath -> String -> IO ()
+outputMatrix !matrix (!height, !width) !dir !name = do
+  let !path = dir </> name <.> "txt"
+  writeFile path [i|#{height} #{width}\n|]
+  appendFile path $! show matrix
+
 outputOneCase :: (Int, Int, Int, Int) -> FilePath -> (Int64, Int64) -> IO ()
 outputOneCase
   ( !inputHeight,
@@ -136,19 +142,15 @@ outputOneCase
     let !outputDirPath =
           path
             </> [i|#{inputHeight}x#{inputWidth}_#{weightHeight}x#{weightWidth}|]
-        !inputFile = outputDirPath </> "input" <.> "txt"
-        !weightFile = outputDirPath </> "weight" <.> "txt"
-        !outputFile = outputDirPath </> "output" <.> "txt"
 
     createDirectoryIfMissing True outputDirPath
 
-    writeFile inputFile [i|#{inputHeight} #{inputWidth}\n|]
-    writeFile weightFile [i|#{weightHeight} #{weightWidth}\n|]
-    writeFile outputFile [i|#{inputHeight-weightHeight+1} #{inputWidth-weightWidth+1}\n|]
+    let !(outputHeight, outputWidth) =
+          (inputHeight - weightHeight + 1, inputWidth - weightWidth + 1)
 
-    appendFile inputFile $ show input
-    appendFile weightFile $ show weight
-    appendFile outputFile $ show output
+    outputMatrix input (inputHeight, inputWidth) outputDirPath "input"
+    outputMatrix weight (weightHeight, weightWidth) outputDirPath "weight"
+    outputMatrix output (outputHeight, outputWidth) outputDirPath "output"
 
 outputCases :: [(Int, Int, Int, Int)] -> FilePath -> IO ()
 outputCases !shapeList !path = do
