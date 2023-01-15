@@ -8,10 +8,9 @@ module Main (main) where
 import Control.Concurrent (forkFinally, putMVar, takeMVar)
 import Control.Concurrent.MVar (newEmptyMVar)
 import Control.Monad (replicateM_)
-import Control.Monad.ST.Strict (ST)
 import Control.Monad.State.Strict (State, runState, state)
 import Data.Array.MArray (Ix, MArray (newArray), readArray, writeArray)
-import Data.Array.ST (STUArray, runSTUArray)
+import Data.Array.ST (runSTUArray)
 import Data.Array.Unboxed (IArray, UArray, (!))
 import Data.Foldable (for_)
 import Data.Int (Int64)
@@ -103,25 +102,15 @@ genOneCase
     !weightWidth
     )
   (!seed1, !seed2) =
-    let !input =
-          runSTUArray
-            ( randMatrix inputHeight inputWidth seed1 ::
-                (forall s. ST s (STUArray s Int RandomNumberType))
-            )
-        !weight =
-          runSTUArray
-            ( randMatrix weightHeight weightWidth seed2 ::
-                (forall s. ST s (STUArray s Int RandomNumberType))
-            )
+    let !input = runSTUArray $! randMatrix inputHeight inputWidth seed1
+        !weight = runSTUArray $! randMatrix weightHeight weightWidth seed2
         !output =
-          runSTUArray
-            ( convolution
-                input
-                (inputHeight, inputWidth)
-                weight
-                (weightHeight, weightWidth) ::
-                (forall s. ST s (STUArray s Int RandomNumberType))
-            )
+          runSTUArray $!
+            convolution
+              input
+              (inputHeight, inputWidth)
+              weight
+              (weightHeight, weightWidth)
      in (input, weight, output)
 
 outputMatrix :: UArray Int RandomNumberType -> (Int, Int) -> FilePath -> String -> IO ()
