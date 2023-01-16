@@ -13,6 +13,7 @@ import Data.Array.MArray (Ix, MArray (newArray), readArray, writeArray)
 import Data.Array.ST (runSTUArray)
 import Data.Array.Unboxed (IArray, UArray, (!))
 import Data.Foldable (for_)
+import Data.Functor ((<&>))
 import Data.Int (Int64)
 import Data.String.Interpolate (i)
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
@@ -36,9 +37,10 @@ randMatrix !height !width !seed = do
         ( if ix >= height * width
             then return arr
             else
-              let !(int, nextSeed) = runState rng s
+              let castInt int = fromIntegral (int `div` 128) - 128
+                  !(float, nextSeed) = runState (rng <&> castInt) s
                in ( do
-                      writeArray arr ix (fromIntegral (int `div` 128) - 128)
+                      writeArray arr ix float
                       fill (ix + 1) nextSeed
                   )
         )
@@ -89,11 +91,12 @@ convolution !input (!inputHeight, !inputWidth) !weight (!weightHeight, !weightWi
       writeArray arr ix $! f origin
 
 genOneCase ::
-  (Int, Int, Int, Int) ->
+  (Ix a, Num a, Enum a) =>
+  (a, a, a, a) ->
   (Int64, Int64) ->
-  ( UArray Int RandomNumberType,
-    UArray Int RandomNumberType,
-    UArray Int RandomNumberType
+  ( UArray a RandomNumberType,
+    UArray a RandomNumberType,
+    UArray a RandomNumberType
   )
 genOneCase
   ( !inputHeight,
