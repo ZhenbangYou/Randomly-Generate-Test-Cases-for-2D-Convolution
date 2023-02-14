@@ -7,17 +7,17 @@ module Main (main) where
 
 import Control.Concurrent (forkFinally, putMVar, takeMVar)
 import Control.Concurrent.MVar (newEmptyMVar)
-import Control.Monad (replicateM_)
+import Control.Monad (forM_, replicateM_)
 import Control.Monad.State.Strict (State, runState, state)
 import Data.Array.MArray (Ix, MArray (newArray), readArray, writeArray)
 import Data.Array.ST (runSTUArray)
 import Data.Array.Unboxed (IArray, UArray, (!))
-import Data.Foldable (for_)
 import Data.Functor ((<&>))
 import Data.Int (Int64)
 import Data.String.Interpolate (i)
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
 import System.Directory (createDirectoryIfMissing)
+import System.Directory.Internal.Prelude (getArgs)
 import System.FilePath ((<.>), (</>))
 
 type RandomNumberType = Float
@@ -64,16 +64,16 @@ convolution !input (!inputHeight, !inputWidth) !weight (!weightHeight, !weightWi
   let !(outputHeight, outputWidth) =
         (inputHeight - weightHeight + 1, inputWidth - weightWidth + 1)
   !output <- newArray (0, outputHeight * outputWidth - 1) 0
-  for_
+  forM_
     [0 .. inputHeight - weightHeight]
     ( \oh ->
-        for_
+        forM_
           [0 .. inputWidth - weightWidth]
           ( \ow ->
-              for_
+              forM_
                 [0 .. weightHeight - 1]
                 ( \wh ->
-                    for_
+                    forM_
                       [0 .. weightWidth - 1]
                       ( \ww -> do
                           let !(ih, iw) = (oh + wh, ow + ww)
@@ -150,7 +150,7 @@ outputOneCase
 outputCases :: [(Int, Int, Int, Int)] -> FilePath -> IO ()
 outputCases !shapeList !path = do
   !wg <- newEmptyMVar
-  for_
+  forM_
     (zip [1 ..] shapeList)
     ( \(!ix, !shape) ->
         forkFinally
@@ -171,6 +171,7 @@ main = do
           (512, 512, 32, 32),
           (512, 512, 64, 64)
         ]
-  outputCases shapeList "./cases"
+  outputPath : _ <- getArgs
+  outputCases shapeList outputPath
   end <- getCurrentTime
   putStrLn [i|#{end `diffUTCTime` start} elapsed.|]

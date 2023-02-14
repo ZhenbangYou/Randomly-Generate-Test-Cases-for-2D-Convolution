@@ -2,8 +2,8 @@
 
 Simple as it is, I implement it in three distinct languages: Kotlin, Python (by PyTorch), and Haskell, which brings me some interesting insights.
 
-
 ## Dependencies for Haskell
+
 ```
 dependencies:
 - base >= 4.7 && < 5
@@ -14,4 +14,10 @@ dependencies:
 - time
 - string-interpolate
 - array
+```
+
+## Dependencies for Python
+
+```
+pytorch
 ```
